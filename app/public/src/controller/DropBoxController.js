@@ -6,7 +6,21 @@ class DropBoxController {
     this.progressBarEl = this.snackModalEl.querySelector('.mc-progress-bar-fg')
     this.fileNameEl = this.snackModalEl.querySelector('.filename')
     this.timeLeftEl = this.snackModalEl.querySelector('.timeleft')
+    this.connectFirebase()
     this.initEvents()
+  }
+
+  connectFirebase() {
+    var firebaseConfig = {
+      apiKey: "AIzaSyD28LGbft0r_n94kcERCiNgpQo9-EfxbSU",
+      authDomain: "curso-dropbox-clone.firebaseapp.com",
+      databaseURL: "https://curso-dropbox-clone.firebaseio.com",
+      projectId: "curso-dropbox-clone",
+      storageBucket: "curso-dropbox-clone.appspot.com",
+      messagingSenderId: "929482234052",
+      appId: "1:929482234052:web:b5fbe011e354b5b7"
+  };
+  firebase.initializeApp(firebaseConfig);
   }
 
   initEvents() {
