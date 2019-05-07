@@ -3,11 +3,13 @@ class DropBoxController {
     this.btnSendFileEl = document.querySelector('#btn-send-file')
     this.inputFilesEl = document.querySelector('#files')
     this.snackModalEl = document.querySelector('#react-snackbar-root')
+    this.listFilesEl = document.querySelector("#list-of-files-and-directories")
     this.progressBarEl = this.snackModalEl.querySelector('.mc-progress-bar-fg')
     this.fileNameEl = this.snackModalEl.querySelector('.filename')
     this.timeLeftEl = this.snackModalEl.querySelector('.timeleft')
     this.connectFirebase()
     this.initEvents()
+    this.readFiles()
   }
 
   connectFirebase() {
@@ -37,6 +39,7 @@ class DropBoxController {
         responses.forEach(res => {
           this.getFirebaseRef().push().set(res.files['input-file'])
         })
+        this.uploadCompleted()
       }).catch(e => {
         this.uploadCompleted()
         console.error(e)
@@ -120,13 +123,16 @@ class DropBoxController {
     return ''
   }
 
-  getFileView(file) {
-    return `
-      <li>
+  getFileView(key, file) {
+    let li = document.createElement('li')
+    li.dataset.key = key
+
+    li.innerHTML = `
         ${this.getFileIconView(file)}
         <div class="name text-center">${file.name}</div>
-      </li>
       `
+
+    return li
   }
 
   getFileIconView(file) {
@@ -277,5 +283,16 @@ class DropBoxController {
             </g>
         </svg>`
     }
+  }
+
+  readFiles() {
+    this.getFirebaseRef().on('value', snapshot => {
+      this.listFilesEl.innerHTML = ''
+      snapshot.forEach(item => {
+        let key = item.key
+        let data = item.val()
+        this.listFilesEl.appendChild(this.getFileView(key, data))
+      })
+    })
   }
 }
