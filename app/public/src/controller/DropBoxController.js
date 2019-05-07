@@ -131,6 +131,7 @@ class DropBoxController {
         ${this.getFileIconView(file)}
         <div class="name text-center">${file.name}</div>
       `
+    this.initEventsLi(li)
 
     return li
   }
@@ -283,6 +284,39 @@ class DropBoxController {
             </g>
         </svg>`
     }
+  }
+
+  initEventsLi(li) {
+    li.addEventListener('click', e => {
+      if (e.shiftKey) {
+        let firstLi = this.listFilesEl.querySelector('.selected')
+
+        if (firstLi) {
+          let startIndex
+          let endIndex
+          let list = li.parentElement.childNodes
+          list.forEach((el, i) => {
+            if (firstLi === el) startIndex = i
+            if (li === el) endIndex = i
+          })
+
+          let index = [startIndex, endIndex].sort()
+
+          list.forEach((el, i) => {
+            if ( i >= index[0] && i <= index[1])
+              el.classList.add('.selected')
+          })
+          
+          return true
+        }
+      }
+      if (!e.ctrlKey) {
+        this.listFilesEl.querySelectorAll('li.selected').forEach(el => {
+          el.classList.remove('selected')
+        })
+      }
+      li.classList.toggle('selected')
+    })
   }
 
   readFiles() {
