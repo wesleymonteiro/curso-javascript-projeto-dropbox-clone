@@ -19,8 +19,11 @@ class DropBoxController {
       storageBucket: "curso-dropbox-clone.appspot.com",
       messagingSenderId: "929482234052",
       appId: "1:929482234052:web:b5fbe011e354b5b7"
-  };
-  firebase.initializeApp(firebaseConfig);
+    };
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+
+    this.database = firebase.database()
   }
 
   initEvents() {
@@ -29,12 +32,28 @@ class DropBoxController {
     })
 
     this.inputFilesEl.addEventListener('change', event => {
-      this.uploadTask(event.target.files)
+      this.btnSendFileEl.disabled = true
+      this.uploadTask(event.target.files).then(responses => {
+        responses.forEach(res => {
+          this.getFirebaseRef().push().set(res.files['input-file'])
+        })
+      }).catch(e => {
+        this.uploadCompleted()
+        console.error(e)
+      })
 
       this.showModal()
-
-      this.inputFilesEl.value = ''
     })
+  }
+
+  uploadCompleted() {
+    this.showModal(false)
+    this.inputFilesEl.value = ''
+    this.btnSendFileEl.disabled = false
+  }
+
+  getFirebaseRef() {
+    return this.database.ref('files')
   }
 
   showModal(show = true) {
@@ -56,13 +75,9 @@ class DropBoxController {
           } catch (e) {
             reject(e)
           }
-
-          this.showModal(false)
         }
         ajax.onerror = error=>{
           reject(error)
-
-          this.showModal(false)
         }
         ajax.upload.onprogress = event=>{
           this.uploadProgress(event, file)
