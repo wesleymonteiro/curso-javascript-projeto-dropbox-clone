@@ -33,6 +33,18 @@ class DropBoxController {
   }
 
   initEvents() {
+    this.renameBtnEl.addEventListener('click', e => {
+      let li = this.getSelection()[0]
+      let file = JSON.parse(li.dataset.file)
+
+      let name = prompt("Novo nome:", file.name)
+
+      if (name) {
+        file.name = name
+        this.getFirebaseRef().child(li.dataset.key).set(file)
+      }
+    })
+
     this.listFilesEl.addEventListener('selectionchange', e=> {
       switch(this.getSelection().length) {
         case 0:
@@ -50,13 +62,13 @@ class DropBoxController {
       }
     })
 
-    this.sendFileBtnEl.addEventListener('click', event => {
+    this.sendFileBtnEl.addEventListener('click', e => {
       this.inputFilesEl.click()
     })
 
-    this.inputFilesEl.addEventListener('change', event => {
+    this.inputFilesEl.addEventListener('change', e => {
       this.sendFileBtnEl.disabled = true
-      this.uploadTask(event.target.files).then(responses => {
+      this.uploadTask(e.target.files).then(responses => {
         responses.forEach(res => {
           this.getFirebaseRef().push().set(res.files['input-file'])
         })
@@ -93,7 +105,7 @@ class DropBoxController {
         let ajax = new XMLHttpRequest()
 
         ajax.open('POST', '/upload')
-        ajax.onload = event=>{
+        ajax.onload = e=>{
           try {
             resolve(JSON.parse(ajax.responseText))
           } catch (e) {
@@ -103,8 +115,8 @@ class DropBoxController {
         ajax.onerror = error=>{
           reject(error)
         }
-        ajax.upload.onprogress = event=>{
-          this.uploadProgress(event, file)
+        ajax.upload.onprogress = e=>{
+          this.uploadProgress(e, file)
         }
 
         let formData = new FormData()
@@ -147,6 +159,7 @@ class DropBoxController {
   getFileView(key, file) {
     let li = document.createElement('li')
     li.dataset.key = key
+    li.dataset.file = JSON.stringify(file)
 
     li.innerHTML = `
         ${this.getFileIconView(file)}
@@ -315,8 +328,8 @@ class DropBoxController {
     })
   }
 
-  selectLi(li, e) {
-    if (e.shiftKey) {
+  selectLi(li, event) {
+    if (event.shiftKey) {
       let firstLi = this.listFilesEl.querySelector('.selected')
 
       if (firstLi) {
@@ -338,7 +351,7 @@ class DropBoxController {
         return true
       }
     }
-    if (!e.ctrlKey) {
+    if (!event.ctrlKey) {
       this.getSelection().forEach(el => {
         el.classList.remove('selected')
       })
