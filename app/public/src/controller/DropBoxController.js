@@ -1,12 +1,16 @@
 class DropBoxController {
   constructor() {
-    this.btnSendFileEl = document.querySelector('#btn-send-file')
+    this.sendFileBtnEl = document.querySelector('#btn-send-file')
     this.inputFilesEl = document.querySelector('#files')
     this.snackModalEl = document.querySelector('#react-snackbar-root')
     this.listFilesEl = document.querySelector("#list-of-files-and-directories")
+    this.newFolderBtnEl = document.querySelector('#btn-new-folder')
+    this.renameBtnEl = document.querySelector('#btn-rename')
+    this.deleteBtnEl = document.querySelector('#btn-delete')
     this.progressBarEl = this.snackModalEl.querySelector('.mc-progress-bar-fg')
     this.fileNameEl = this.snackModalEl.querySelector('.filename')
     this.timeLeftEl = this.snackModalEl.querySelector('.timeleft')
+    this.onSelectionChange = new Event('selectionchange')
     this.connectFirebase()
     this.initEvents()
     this.readFiles()
@@ -29,12 +33,29 @@ class DropBoxController {
   }
 
   initEvents() {
-    this.btnSendFileEl.addEventListener('click', event => {
+    this.listFilesEl.addEventListener('selectionchange', e=> {
+      switch(this.getSelection().length) {
+        case 0:
+        this.renameBtnEl.style.display = 'none'
+        this.deleteBtnEl.style.display = 'none'
+        break
+        case 1:
+        this.renameBtnEl.style.display = 'block'
+        this.deleteBtnEl.style.display = 'block'
+        break
+        default:
+        this.renameBtnEl.style.display = 'none'
+        this.deleteBtnEl.style.display = 'block'
+        break
+      }
+    })
+
+    this.sendFileBtnEl.addEventListener('click', event => {
       this.inputFilesEl.click()
     })
 
     this.inputFilesEl.addEventListener('change', event => {
-      this.btnSendFileEl.disabled = true
+      this.sendFileBtnEl.disabled = true
       this.uploadTask(event.target.files).then(responses => {
         responses.forEach(res => {
           this.getFirebaseRef().push().set(res.files['input-file'])
@@ -52,7 +73,7 @@ class DropBoxController {
   uploadCompleted() {
     this.showModal(false)
     this.inputFilesEl.value = ''
-    this.btnSendFileEl.disabled = false
+    this.sendFileBtnEl.disabled = false
   }
 
   getFirebaseRef() {
@@ -288,35 +309,45 @@ class DropBoxController {
 
   initEventsLi(li) {
     li.addEventListener('click', e => {
-      if (e.shiftKey) {
-        let firstLi = this.listFilesEl.querySelector('.selected')
+      this.selectLi(li, e)
 
-        if (firstLi) {
-          let startIndex
-          let endIndex
-          let list = li.parentElement.childNodes
-          list.forEach((el, i) => {
-            if (firstLi === el) startIndex = i
-            if (li === el) endIndex = i
-          })
-
-          let index = [startIndex, endIndex].sort()
-
-          list.forEach((el, i) => {
-            if ( i >= index[0] && i <= index[1])
-              el.classList.add('.selected')
-          })
-          
-          return true
-        }
-      }
-      if (!e.ctrlKey) {
-        this.listFilesEl.querySelectorAll('li.selected').forEach(el => {
-          el.classList.remove('selected')
-        })
-      }
-      li.classList.toggle('selected')
+      this.listFilesEl.dispatchEvent(this.onSelectionChange)
     })
+  }
+
+  selectLi(li, e) {
+    if (e.shiftKey) {
+      let firstLi = this.listFilesEl.querySelector('.selected')
+
+      if (firstLi) {
+        let startIndex
+        let endIndex
+        let list = li.parentElement.childNodes
+        list.forEach((el, i) => {
+          if (firstLi === el) startIndex = i
+          if (li === el) endIndex = i
+        })
+
+        let index = [startIndex, endIndex].sort()
+
+        list.forEach((el, i) => {
+          if ( i >= index[0] && i <= index[1])
+            el.classList.add('.selected')
+        })
+        
+        return true
+      }
+    }
+    if (!e.ctrlKey) {
+      this.getSelection().forEach(el => {
+        el.classList.remove('selected')
+      })
+    }
+    li.classList.toggle('selected')
+  }
+
+  getSelection() {
+    return this.listFilesEl.querySelectorAll('li.selected')
   }
 
   readFiles() {
