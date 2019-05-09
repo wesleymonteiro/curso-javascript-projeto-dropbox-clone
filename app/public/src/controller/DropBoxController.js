@@ -30,8 +30,6 @@ class DropBoxController {
     };
     // Initialize Firebase
     firebase.initializeApp(firebaseConfig);
-
-    this.database = firebase.database()
   }
 
   initEvents() {
@@ -39,7 +37,7 @@ class DropBoxController {
       let name = prompt('Nova Pasta')
 
       if (name) {
-        this.getFirebaseRef().push().set({
+        this.getDatabaseRef().push().set({
           name,
           type: 'folder',
           path: this.currentFolder.join('/')
@@ -54,7 +52,7 @@ class DropBoxController {
 
       if (name) {
         file.name = name
-        this.getFirebaseRef().child(li.dataset.key).set(file)
+        this.getDatabaseRef().child(li.dataset.key).set(file)
       }
     })
 
@@ -62,7 +60,7 @@ class DropBoxController {
       this.removeTask().then(responses => {
         responses.forEach(response => {
           if(response.fields.key)
-            this.getFirebaseRef().child(response.fields.key).remove();
+            this.getDatabaseRef().child(response.fields.key).remove();
         })
       }).catch(e => {
         console.error(e)
@@ -96,7 +94,12 @@ class DropBoxController {
 
       this.uploadTask(e.target.files).then(responses => {
         responses.forEach(res => {
-          this.getFirebaseRef().push().set(res.files['input-file'])
+          this.getDatabaseRef().push().set({
+            name: res.name,
+            type: res.contentType,
+            path: res.downloadURL,
+            size: res.size
+          })
         })
         this.uploadCompleted()
       }).catch(e => {
@@ -112,8 +115,12 @@ class DropBoxController {
     this.sendFileBtnEl.disabled = false
   }
 
-  getFirebaseRef(path = this.currentFolder.join('/')) {
-    return this.database.ref(path)
+  getDatabaseRef(path = this.currentFolder.join('/')) {
+    return firebase.database().ref(path)
+  }
+
+  getStorageRef(path = this.currentFolder.join('/')) {
+    return firebase.storage().ref(path)
   }
 
   showModal(show = true) {
@@ -142,18 +149,41 @@ class DropBoxController {
 
     let filesArray = [...files]
     filesArray.forEach(file=>{
-      let formData = new FormData()
-      formData.append('input-file', file)
+      promises.push(new Promise((resolve, reject) => {
 
-      let progress = e=>{
-        this.uploadProgress(e, file)
-      }
+        let fileRef = this.getStorageRef().child(file.name)
+        let task = fileRef.put(file)
+        
+        let formData = new FormData()
+        formData.append('input-file', file)
+        
+        let progress = snapshot=>{
+          this.uploadProgress({
+            loaded: snapshot.bytesTransferred,
+            total: snapshot.totalBytes
+          }, file)
+        }
+        
+        let error = error=>{
+          reject(error)
+        }
+        
+        let success = ()=>{
+          fileRef.getMetadata().then(metadata => {
+            fileRef.getDownloadURL().then(url => {
+              metadata.downloadURL = url
+              resolve(metadata)
+            }).catch(error => {
+              reject(error)
+            })
+          }).catch(error => {
+            reject(error)
+          })
+        }
+        task.on('state_changed', progress, error, success)
+      }))
 
-      let loadstart = ()=>{
-        this.startTime = Date.now()
-      }
-
-      promises.push(this.ajax('/upload', 'POST', formData, progress, loadstart))
+      // promises.push(this.ajax('/upload', 'POST', formData, progress, loadstart))
     })
 
     return Promise.all(promises)
@@ -396,7 +426,7 @@ class DropBoxController {
 
   openFolder() {
     if(this.lastFolder)
-      this.getFirebaseRef(this.lastFolder).off('value')
+      this.getDatabaseRef(this.lastFolder).off('value')
 
     this.renderNavigation()
     this.readFiles()
@@ -473,7 +503,7 @@ class DropBoxController {
 
   readFiles() {
     this.lastFolder = this.currentFolder.join('/')
-    this.getFirebaseRef().on('value', snapshot => {
+    this.getDatabaseRef().on('value', snapshot => {
       this.listFilesEl.innerHTML = ''
       snapshot.forEach(item => {
         let key = item.key
