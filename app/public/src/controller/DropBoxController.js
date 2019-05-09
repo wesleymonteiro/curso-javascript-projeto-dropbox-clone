@@ -33,6 +33,8 @@ class DropBoxController {
   }
 
   initEvents() {
+    this.initKeyboardEvents()
+
     this.newFolderBtnEl.addEventListener('click', e => {
       let name = prompt('Nova Pasta')
 
@@ -108,6 +110,26 @@ class DropBoxController {
         this.uploadCompleted()
         console.error(e)
       })
+    })
+  }
+
+  initKeyboardEvents() {
+    window.addEventListener('keypress', e => {
+      if (e.key === 'Enter' && this.getSelection().length === 1) {
+          this.openFile(this.getSelection()[0])
+      }
+
+      if (e.key === 'a' && e.ctrlKey) {
+        this.listFilesEl.querySelectorAll('li').forEach(file => {
+          file.classList.add('selected')
+        })
+      }
+    })
+
+    window.addEventListener('keyup', e => {
+      if(e.key === 'Delete' && this.getSelection().length > 0) {
+        this.deleteBtnEl.click()
+      }
     })
   }
 
@@ -437,16 +459,7 @@ class DropBoxController {
 
   initEventsLi(li) {
     li.addEventListener('dblclick', e => {
-      let file = JSON.parse(li.dataset.file)
-
-      switch (file.type) {
-        case 'folder':
-        this.currentFolder.push(file.name)
-        this.openFolder()
-        break
-        default:
-        window.open(file.path)
-      }
+      this.openFile(li)
     })
 
     li.addEventListener('click', e => {
@@ -454,6 +467,19 @@ class DropBoxController {
 
       this.listFilesEl.dispatchEvent(this.onSelectionChange)
     })
+  }
+
+  openFile(li) {
+    let file = JSON.parse(li.dataset.file)
+
+    switch (file.type) {
+      case 'folder':
+      this.currentFolder.push(file.name)
+      this.openFolder()
+      break
+      default:
+      window.open(file.path)
+    }
   }
 
   openFolder() {
