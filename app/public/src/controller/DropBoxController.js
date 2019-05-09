@@ -1,9 +1,11 @@
 class DropBoxController {
   constructor() {
+    this.currentFolder = ['files']
+    this.navigationEl = document.querySelector('#browse-location')
     this.sendFileBtnEl = document.querySelector('#btn-send-file')
     this.inputFilesEl = document.querySelector('#files')
     this.snackModalEl = document.querySelector('#react-snackbar-root')
-    this.listFilesEl = document.querySelector("#list-of-files-and-directories")
+    this.listFilesEl = document.querySelector('#list-of-files-and-directories')
     this.newFolderBtnEl = document.querySelector('#btn-new-folder')
     this.renameBtnEl = document.querySelector('#btn-rename')
     this.deleteBtnEl = document.querySelector('#btn-delete')
@@ -13,7 +15,7 @@ class DropBoxController {
     this.onSelectionChange = new Event('selectionchange')
     this.connectFirebase()
     this.initEvents()
-    this.readFiles()
+    this.openFolder()
   }
 
   connectFirebase() {
@@ -33,11 +35,22 @@ class DropBoxController {
   }
 
   initEvents() {
+    this.newFolderBtnEl.addEventListener('click', e => {
+      let name = prompt('Nova Pasta')
+
+      if (name) {
+        this.getFirebaseRef().push().set({
+          name,
+          type: 'folder',
+          path: this.currentFolder.join('/')
+        })
+      }
+    })
     this.renameBtnEl.addEventListener('click', e => {
       let li = this.getSelection()[0]
       let file = JSON.parse(li.dataset.file)
 
-      let name = prompt("Novo nome:", file.name)
+      let name = prompt('Novo nome:', file.name)
 
       if (name) {
         file.name = name
@@ -99,8 +112,8 @@ class DropBoxController {
     this.sendFileBtnEl.disabled = false
   }
 
-  getFirebaseRef() {
-    return this.database.ref('files')
+  getFirebaseRef(path = this.currentFolder.join('/')) {
+    return this.database.ref(path)
   }
 
   showModal(show = true) {
@@ -361,11 +374,32 @@ class DropBoxController {
   }
 
   initEventsLi(li) {
+    li.addEventListener('dblclick', e => {
+      let file = JSON.parse(li.dataset.file)
+
+      switch (file.type) {
+        case 'folder':
+        this.currentFolder.push(file.name)
+        this.openFolder()
+        break
+        default:
+        window.open(`/file?path=${file.path}`)
+      }
+    })
+
     li.addEventListener('click', e => {
       this.selectLi(li, e)
 
       this.listFilesEl.dispatchEvent(this.onSelectionChange)
     })
+  }
+
+  openFolder() {
+    if(this.lastFolder)
+      this.getFirebaseRef(this.lastFolder).off('value')
+
+    this.renderNavigation()
+    this.readFiles()
   }
 
   selectLi(li, event) {
@@ -403,13 +437,49 @@ class DropBoxController {
     return this.listFilesEl.querySelectorAll('li.selected')
   }
 
+  renderNavigation() {
+    let nav = document.createElement('nav')
+    let path = []
+    this.currentFolder.forEach((folder, index, array) => {
+      let span = document.createElement('span')
+      path.push(folder)
+      if (index+1 === array.length) {
+        span.innerHTML = folder
+      } else {
+        span.className = 'breadcrumb-segment__wrapper'
+        span.innerHTML = ` <span class="ue-effect-container uee-BreadCrumbSegment-link-0">
+                                <a href="#" data-path="${path.join('/')}" class="breadcrumb-segment">${folder}</a>
+                            </span>
+                            <svg width="24" height="24" viewBox="0 0 24 24" class="mc-icon-template-stateless" style="top: 4px; position: relative;">
+                                <title>arrow-right</title>
+                                <path d="M10.414 7.05l4.95 4.95-4.95 4.95L9 15.534 12.536 12 9 8.464z" fill="#637282" fill-rule="evenodd"></path>
+                            </svg>`
+      }
+      nav.appendChild(span)
+      
+    })
+
+    this.navigationEl.innerHTML = nav.innerHTML
+    this.navigationEl.querySelectorAll('a').forEach(a => {
+      a.addEventListener('click', e => {
+        e.preventDefault()
+
+        this.currentFolder = a.dataset.path.split('/')
+
+        this.openFolder()
+      })
+    })
+  }
+
   readFiles() {
+    this.lastFolder = this.currentFolder.join('/')
     this.getFirebaseRef().on('value', snapshot => {
       this.listFilesEl.innerHTML = ''
       snapshot.forEach(item => {
         let key = item.key
         let data = item.val()
-        this.listFilesEl.appendChild(this.getFileView(key, data))
+        if (data.type)
+          this.listFilesEl.appendChild(this.getFileView(key, data))
       })
     })
   }
