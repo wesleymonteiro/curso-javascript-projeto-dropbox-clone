@@ -40,7 +40,7 @@ class DropBoxController {
         this.getDatabaseRef().push().set({
           name,
           type: 'folder',
-          path: this.currentFolder.join('/')
+          path: this.currentFolderPath()
         })
       }
     })
@@ -59,11 +59,13 @@ class DropBoxController {
     this.deleteBtnEl.addEventListener('click', e => {
       this.removeTask().then(responses => {
         responses.forEach(response => {
-          if(response.fields.key)
+          if (response.fields.key)
             this.getDatabaseRef().child(response.fields.key).remove();
+            this.listFilesEl.dispatchEvent(this.onSelectionChange)
         })
       }).catch(e => {
         console.error(e)
+        this.listFilesEl.dispatchEvent(this.onSelectionChange)
       })
     })
 
@@ -109,17 +111,21 @@ class DropBoxController {
     })
   }
 
+  currentFolderPath() {
+    return this.currentFolder.join('/')
+  }
+
   uploadCompleted() {
     this.showModal(false)
     this.inputFilesEl.value = ''
     this.sendFileBtnEl.disabled = false
   }
 
-  getDatabaseRef(path = this.currentFolder.join('/')) {
+  getDatabaseRef(path = this.currentFolderPath()) {
     return firebase.database().ref(path)
   }
 
-  getStorageRef(path = this.currentFolder.join('/')) {
+  getStorageRef(path = this.currentFolderPath()) {
     return firebase.storage().ref(path)
   }
 
@@ -133,47 +139,96 @@ class DropBoxController {
     this.getSelection().forEach(li => {
       let file = JSON.parse(li.dataset.file)
       let key = li.dataset.key
-      
+
       promises.push(new Promise((resolve, reject) => {
-        let fileRef = this.getStorageRef().child(file.name)
-        fileRef.delete().then(() => {
-          resolve({
-            fields: key
+        if (file.type === 'folder') {
+          this.removeFolder(this.currentFolderPath(), file.name, key).then(() => {
+            resolve({
+              fields: { key }
+            })
+          }).catch(error => {
+            reject(error)
           })
-        }).catch(error => {
-          reject(error)
-        })
+        } else if (file.type) {
+          this.removeFile(this.currentFolderPath(), file.name).then(() => {
+            resolve({
+              fields: { key }
+            })
+          }).catch(error => {
+            reject(error)
+          })
+        }
       }))
     })
 
     return Promise.all(promises)
   }
 
+  removeFolder(ref, name, key) {
+    return new Promise((resolve, reject) => {
+      let folderRef = this.getDatabaseRef(ref + '/' + name)
+      folderRef.on('value', snapshot => {
+        folderRef.off('value')
+
+        if (snapshot.exists()) {
+          snapshot.forEach(item => {
+            let data = item.val()
+            data.key = item.key
+            
+            if (data.type === 'folder') {
+              this.removeFolder(ref + '/' + name, data.name, key).then(() => {
+                resolve({
+                  key: data.key
+                })
+              }).catch(error => {
+                reject(error)
+              })
+            } else if (data.type) {
+              this.removeFile(ref + '/' + name, data.name).then(() => {
+                resolve({
+                  key: data.key
+                })
+              }).catch(error => {
+                reject(error)
+              })
+            }
+          }) 
+          folderRef.remove()
+        } else 
+          this.getDatabaseRef(ref).child(key).remove()
+      })
+    })
+  }
+
+  removeFile(ref, name) {
+    let fileRef = this.getStorageRef(ref).child(name)
+    return fileRef.delete()
+  }
+
   uploadTask(files) {
     let promises = []
 
     let filesArray = [...files]
-    filesArray.forEach(file=>{
+    filesArray.forEach(file => {
       promises.push(new Promise((resolve, reject) => {
-
         let fileRef = this.getStorageRef().child(file.name)
+        this.startTime = Date.now()
         let task = fileRef.put(file)
-        
         let formData = new FormData()
         formData.append('input-file', file)
         
-        let progress = snapshot=>{
+        let progress = snapshot => {
           this.uploadProgress({
             loaded: snapshot.bytesTransferred,
             total: snapshot.totalBytes
           }, file)
         }
         
-        let error = error=>{
+        let error = error => {
           reject(error)
         }
         
-        let success = ()=>{
+        let success = () => {
           fileRef.getMetadata().then(metadata => {
             fileRef.getDownloadURL().then(url => {
               metadata.downloadURL = url
@@ -187,36 +242,9 @@ class DropBoxController {
         }
         task.on('state_changed', progress, error, success)
       }))
-
-      // promises.push(this.ajax('/upload', 'POST', formData, progress, loadstart))
     })
 
     return Promise.all(promises)
-  }
-
-  ajax(url, method = 'GET', formData = new FormData(), onprogress = function(){}, onloadstart = function(){}) {
-
-    return new Promise((resolve, reject) => {
-      
-      
-      let ajax = new XMLHttpRequest()
-      
-      ajax.open(method, url)
-      ajax.onload = e=>{
-        try {
-          resolve(JSON.parse(ajax.responseText))
-        } catch (e) {
-          reject(e)
-        }
-      }
-      ajax.onerror = error=>{
-        reject(error)
-      }
-      ajax.upload.onprogress = onprogress
-      
-      onloadstart() 
-      ajax.send(formData)
-    })
   }
 
   uploadProgress(event, file) {
@@ -238,9 +266,8 @@ class DropBoxController {
       return `${hours} horas, ${minutes} minutos e ${seconds} segundos`
     if (minutes > 0)
       return `${minutes} minutos e ${seconds} segundos`
-    if (seconds > 0)
+    if (seconds)
       return `${seconds} segundos`
-
     return ''
   }
 
@@ -430,11 +457,12 @@ class DropBoxController {
   }
 
   openFolder() {
-    if(this.lastFolder)
+    if (this.lastFolder)
       this.getDatabaseRef(this.lastFolder).off('value')
 
     this.renderNavigation()
     this.readFiles()
+    this.listFilesEl.dispatchEvent(this.onSelectionChange)
   }
 
   selectLi(li, event) {
@@ -491,7 +519,6 @@ class DropBoxController {
                             </svg>`
       }
       nav.appendChild(span)
-      
     })
 
     this.navigationEl.innerHTML = nav.innerHTML
@@ -507,7 +534,7 @@ class DropBoxController {
   }
 
   readFiles() {
-    this.lastFolder = this.currentFolder.join('/')
+    this.lastFolder = this.currentFolderPath()
     this.getDatabaseRef().on('value', snapshot => {
       this.listFilesEl.innerHTML = ''
       snapshot.forEach(item => {
