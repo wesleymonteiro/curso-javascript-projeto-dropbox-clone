@@ -9,6 +9,7 @@ class DropBoxController {
     this.newFolderBtnEl = document.querySelector('#btn-new-folder')
     this.renameBtnEl = document.querySelector('#btn-rename')
     this.deleteBtnEl = document.querySelector('#btn-delete')
+    this.selectedLiNameEl = document.querySelector('#selected-li-name')
     this.progressBarEl = this.snackModalEl.querySelector('.mc-progress-bar-fg')
     this.fileNameEl = this.snackModalEl.querySelector('.filename')
     this.timeLeftEl = this.snackModalEl.querySelector('.timeleft')
@@ -46,6 +47,7 @@ class DropBoxController {
         })
       }
     })
+
     this.renameBtnEl.addEventListener('click', e => {
       let li = this.getSelection()[0]
       let file = JSON.parse(li.dataset.file)
@@ -74,14 +76,18 @@ class DropBoxController {
     this.listFilesEl.addEventListener('selectionchange', e=> {
       switch(this.getSelection().length) {
         case 0:
+        this.selectedLiNameEl.style.display = 'none'
         this.renameBtnEl.style.display = 'none'
         this.deleteBtnEl.style.display = 'none'
         break
         case 1:
+        this.selectedLiNameEl.innerHTML = JSON.parse(app.getSelection()[0].dataset.file).name
+        this.selectedLiNameEl.style.display = 'block'
         this.renameBtnEl.style.display = 'block'
         this.deleteBtnEl.style.display = 'block'
         break
         default:
+        this.selectedLiNameEl.style.display = 'none'
         this.renameBtnEl.style.display = 'none'
         this.deleteBtnEl.style.display = 'block'
         break
@@ -300,7 +306,7 @@ class DropBoxController {
 
     li.innerHTML = `
         ${this.getFileIconView(file)}
-        <div class="name text-center">${file.name}</div>
+        <div id="file-name" class="name text-center">${this.truncateName(file.name)}</div>
       `
     this.initEventsLi(li)
 
@@ -455,6 +461,20 @@ class DropBoxController {
             </g>
         </svg>`
     }
+  }
+
+  truncateName(name) {
+    let maxLength = 20
+    let separator = '...'
+    if (name.length <= maxLength) return name;
+    
+    var sepLen = separator.length,
+        charsToShow = maxLength - sepLen,
+        frontChars = Math.ceil(charsToShow/2),
+        backChars = 5;
+    
+    return name.substr(0, frontChars) + separator + 
+            name.substr(name.length - backChars)
   }
 
   initEventsLi(li) {
