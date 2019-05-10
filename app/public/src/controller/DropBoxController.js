@@ -128,17 +128,68 @@ class DropBoxController {
       }
 
       if (e.key === 'a' && e.ctrlKey) {
-        this.listFilesEl.querySelectorAll('li').forEach(file => {
+        this.getAllFiles().forEach(file => {
           file.classList.add('selected')
         })
       }
     })
 
     window.addEventListener('keyup', e => {
-      if(e.key === 'Delete' && this.getSelection().length > 0) {
+      if (e.key === 'Delete' && this.getSelection().length > 0) {
         this.deleteBtnEl.click()
       }
+      
+      else if (e.key === 'Backspace' && this.currentFolder.length > 1) {
+        this.currentFolder.pop()
+        this.openFolder()
+      }
+      
+      else if (e.key === 'Escape')
+        this.deselectAll()
+
+      else if ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && this.lastSelection && this.firstSelection) {
+        let direction = e.key === 'ArrowRight' ? 1 : -1
+        let lastSelectedIndex = [...this.getAllFiles()].indexOf(this.lastSelection)
+        let firstSelectedIndex = [...this.getAllFiles()].indexOf(this.firstSelection)
+        let addSelected = () => {
+          if ((lastSelectedIndex + direction) > -1 && (lastSelectedIndex + direction) < this.getAllFiles().length)
+            this.lastSelection = this.getAllFiles()[lastSelectedIndex + direction]
+          this.lastSelection.classList.add('selected')
+          this.listFilesEl.dispatchEvent(this.onSelectionChange)
+        }
+        let removeSelected = () => {
+          this.lastSelection.classList.remove('selected')
+          this.lastSelection = this.getAllFiles()[lastSelectedIndex + direction]
+          this.listFilesEl.dispatchEvent(this.onSelectionChange)
+        }
+        if (!e.shiftKey) {
+          this.deselectAll()
+          addSelected()
+          this.firstSelection = this.lastSelection
+        } else if (lastSelectedIndex > firstSelectedIndex) {
+          switch(e.key) {
+            case 'ArrowRight':
+            addSelected()
+            break;
+            default:
+            removeSelected()
+          }
+        } else if (lastSelectedIndex < firstSelectedIndex) {
+          switch(e.key) {
+            case 'ArrowRight':
+            removeSelected()
+            break;
+            default:
+            addSelected()
+          }
+        } else
+         addSelected()
+      }
     })
+  }
+
+  getAllFiles() {
+    return this.listFilesEl.querySelectorAll('li')
   }
 
   currentFolderPath() {
@@ -515,6 +566,8 @@ class DropBoxController {
   }
 
   selectLi(li, event) {
+    this.lastSelection = li
+    this.firstSelection = li
     if (event.shiftKey) {
       let firstLi = this.listFilesEl.querySelector('.selected')
 
@@ -537,16 +590,20 @@ class DropBoxController {
         return
       }
     }
-    if (!event.ctrlKey) {
-      this.getSelection().forEach(el => {
-        el.classList.remove('selected')
-      })
-    }
+    if (!event.ctrlKey)
+      this.deselectAll()
+
     li.classList.toggle('selected')
   }
 
   getSelection() {
     return this.listFilesEl.querySelectorAll('li.selected')
+  }
+
+  deselectAll() {
+    this.getSelection().forEach(el => {
+      el.classList.remove('selected')
+    })
   }
 
   renderNavigation() {
