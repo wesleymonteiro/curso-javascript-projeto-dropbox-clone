@@ -61,16 +61,18 @@ class DropBoxController {
     })
 
     this.deleteBtnEl.addEventListener('click', e => {
-      this.removeTask().then(responses => {
-        responses.forEach(response => {
-          if (response.fields.key)
+      if (confirm("Deseja mesmo deletar? Esse processo não poderá ser desfeito no momento")) {
+        this.removeTask().then(responses => {
+          responses.forEach(response => {
+            if (response.fields.key)
             this.getDatabaseRef().child(response.fields.key).remove();
             this.listFilesEl.dispatchEvent(this.onSelectionChange)
+          })
+        }).catch(e => {
+          console.error(e)
+          this.listFilesEl.dispatchEvent(this.onSelectionChange)
         })
-      }).catch(e => {
-        console.error(e)
-        this.listFilesEl.dispatchEvent(this.onSelectionChange)
-      })
+      }
     })
 
     this.listFilesEl.addEventListener('selectionchange', e=> {
@@ -494,6 +496,7 @@ class DropBoxController {
 
     switch (file.type) {
       case 'folder':
+      li.classList.remove('selected')
       this.currentFolder.push(file.name)
       this.openFolder()
       break
